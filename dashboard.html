@@ -5,17 +5,366 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Movies Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/globe.gl"></script>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="world_countries.js"></script>
     <script src="missing_data.js"></script>
     <script src="movies_data.js"></script>
     <style>
-        #map { height: 500px; width: 100%; border-radius: 0.5rem; z-index: 1; }
+        #map { height: 620px; width: 100%; border-radius: 0.75rem; z-index: 1; background: #030712; }
         .tag { display: inline-block; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 600; margin: 0.25rem; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         .tag-red { background-color: #fee2e2; color: #991b1b; }
         .tag-blue { background-color: #dbeafe; color: #1e40af; }
         .tag-green { background-color: #dcfce3; color: #166534; }
         .tag-yellow { background-color: #fef3c7; color: #92400e; }
         .tag-gray { background-color: #f3f4f6; color: #374151; }
+
+        /* Google Earth High-Resolution Satellite & Floating Controls UI */
+        #map-container {
+            position: relative;
+            width: 100%;
+            height: 620px;
+            overflow: hidden;
+            border-radius: 0.75rem;
+            background: #030712;
+        }
+        #map-container:fullscreen,
+        #map-container:-webkit-full-screen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            border-radius: 0 !important;
+            border: none !important;
+        }
+        #map-container:fullscreen #map,
+        #map-container:-webkit-full-screen #map {
+            height: 100vh !important;
+            border-radius: 0 !important;
+        }
+
+        .ge-top-bar {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            right: 14px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .ge-search-container {
+            position: relative;
+            flex: 1;
+            max-width: 440px;
+            pointer-events: auto;
+        }
+        .ge-search-box {
+            display: flex;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.86);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 9999px;
+            padding: 7px 14px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+            transition: all 0.2s ease;
+        }
+        .ge-search-box:focus-within {
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25), 0 6px 24px rgba(0, 0, 0, 0.55);
+            background: rgba(15, 23, 42, 0.96);
+        }
+        .ge-search-box input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 13px;
+            margin-left: 8px;
+            width: 100%;
+        }
+        .ge-search-box input::placeholder {
+            color: #94a3b8;
+        }
+        .ge-search-dropdown {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 12px;
+            max-height: 290px;
+            overflow-y: auto;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+            z-index: 1010;
+        }
+        .ge-search-item {
+            padding: 9px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            transition: background 0.15s ease;
+        }
+        .ge-search-item:last-child {
+            border-bottom: none;
+        }
+        .ge-search-item:hover, .ge-search-item.active {
+            background: rgba(56, 189, 248, 0.15);
+        }
+
+        .ge-active-pill {
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid #38bdf8;
+            border-radius: 9999px;
+            padding: 6px 14px;
+            color: #38bdf8;
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+            pointer-events: auto;
+        }
+        .ge-pill-reset {
+            background: rgba(56, 189, 248, 0.2);
+            border-radius: 9999px;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .ge-pill-reset:hover {
+            background: #38bdf8;
+            color: #030712;
+        }
+
+        .ge-status-indicator {
+            margin-left: auto;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 9999px;
+            padding: 6px 12px;
+            color: #e2e8f0;
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            pointer-events: auto;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        }
+        .ge-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 9999px;
+            background: #34d399;
+            box-shadow: 0 0 8px #34d399;
+        }
+        .ge-status-dot.loading {
+            background: #38bdf8;
+            box-shadow: 0 0 10px #38bdf8;
+            animation: gePulse 1.2s infinite ease-in-out;
+        }
+        @keyframes gePulse {
+            0%, 100% { opacity: 0.4; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.3); }
+        }
+
+        .ge-controls-stack {
+            position: absolute;
+            top: 68px;
+            right: 14px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+        .ge-control-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+            transition: all 0.2s ease;
+        }
+        .ge-control-btn:hover {
+            background: rgba(30, 41, 59, 0.95);
+            color: #38bdf8;
+            border-color: #38bdf8;
+            transform: scale(1.05);
+        }
+        .ge-control-separator {
+            width: 100%;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.12);
+            margin: 2px 0;
+        }
+
+        .ge-flyout-menu {
+            position: absolute;
+            right: 46px;
+            top: 0;
+            width: 270px;
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 14px;
+            padding: 12px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+            z-index: 1010;
+        }
+        .ge-menu-header {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        .ge-layer-options {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .ge-layer-opt {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            width: 100%;
+            color: #e2e8f0;
+        }
+        .ge-layer-opt:hover {
+            background: rgba(51, 65, 85, 0.7);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        .ge-layer-opt.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: #38bdf8;
+        }
+        .ge-layer-icon {
+            font-size: 18px;
+        }
+        .ge-menu-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 10px 0;
+        }
+        .ge-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #e2e8f0;
+            cursor: pointer;
+            padding: 4px 0;
+        }
+        .ge-toggle-label input[type="checkbox"] {
+            accent-color: #38bdf8;
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+
+        .ge-bottom-bar {
+            position: absolute;
+            bottom: 10px;
+            left: 12px;
+            right: 12px;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+        }
+        .ge-coords-badge {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            pointer-events: auto;
+        }
+        .ge-leaflet-tooltip {
+            background: rgba(15, 23, 42, 0.94) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            border: 1px solid #38bdf8 !important;
+            border-radius: 8px !important;
+            color: #ffffff !important;
+            padding: 6px 12px !important;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5) !important;
+        }
+        .ge-leaflet-tooltip::before {
+            border-top-color: #38bdf8 !important;
+        }
+        .leaflet-control-attribution {
+            background: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(6px) !important;
+            color: #94a3b8 !important;
+            font-size: 10px !important;
+            border-radius: 4px !important;
+            padding: 2px 6px !important;
+            margin-right: 8px !important;
+            margin-bottom: 8px !important;
+        }
+        .leaflet-control-attribution a {
+            color: #38bdf8 !important;
+        }
+        .leaflet-control-scale {
+            margin-left: 8px !important;
+            margin-bottom: 8px !important;
+        }
+        .leaflet-control-scale-line {
+            background: rgba(15, 23, 42, 0.8) !important;
+            backdrop-filter: blur(6px) !important;
+            border: 2px solid #38bdf8 !important;
+            border-top: none !important;
+            color: #e2e8f0 !important;
+            font-size: 10px !important;
+            font-family: monospace !important;
+            line-height: 1.2 !important;
+            padding: 2px 5px !important;
+        }
     </style>
 </head>
 <body class="bg-gray-50 font-sans p-4 md:p-8">
@@ -753,20 +1102,193 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             <!-- Left Column: World Map -->
-            <div class="lg:col-span-2 bg-gray-900 p-2 rounded-xl shadow-xl border border-gray-800">
-                <div class="p-4 border-b border-gray-800 mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div id="map-outer-card" class="lg:col-span-2 bg-gray-950 p-2.5 rounded-2xl shadow-2xl border border-gray-800 flex flex-col">
+                <div class="p-3.5 px-4 border-b border-gray-800 mb-2.5 flex flex-wrap items-center justify-between gap-2">
                     <div>
-                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                            <span>Orbital Satellite World Map</span>
-                            <span class="bg-cyan-900/60 text-cyan-300 border border-cyan-500/30 text-xs px-2 py-0.5 rounded-full font-medium">Satellite View</span>
+                        <h2 class="text-xl font-extrabold text-white flex items-center gap-2.5">
+                            <span class="text-2xl">🛰️</span>
+                            <span>High-Resolution Satellite World Map</span>
+                            <span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1.5 shadow-sm">
+                                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                                Google Earth Experience
+                            </span>
                         </h2>
-                        <p class="text-sm text-cyan-200/80 mt-1">Photorealistic satellite imagery. Click on any country, island dot, or Antarctica to view data.</p>
+                        <p class="text-xs text-cyan-200/70 mt-1">Sub-meter photorealistic satellite imagery &bull; Stable 2D perspective &bull; Deep street, road & building zoom &bull; Click any country or island</p>
                     </div>
-                    <button onclick="updateLocationStats('Antarctica (South Pole & Research Stations)')" class="bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 hover:border-cyan-400 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
-                        <span>❄️ Antarctica Details</span>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="updateLocationStats('Antarctica (South Pole & Research Stations)')" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
+                            <span>❄️ Antarctica Research</span>
+                        </button>
+                    </div>
                 </div>
-                <div id="map"></div>
+
+                <!-- Google Earth Style Map Wrapper with Floating HUD Controls -->
+                <div id="map-container" class="relative w-full rounded-xl overflow-hidden border border-slate-800 bg-[#060b14] select-none">
+                    
+                    <!-- Top Floating Bar: Search, Quick Selection & Tile Status -->
+                    <div class="ge-top-bar">
+                        <!-- Search Box -->
+                        <div class="ge-search-container" id="ge-search-container">
+                            <div class="ge-search-box">
+                                <svg class="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                                <input type="text" id="map-search-input" placeholder="Search countries, cities, addresses, landmarks..." autocomplete="off" />
+                                <button id="map-search-clear" class="hidden text-gray-400 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded-full hover:bg-white/10" title="Clear">✕</button>
+                            </div>
+                            <div id="map-search-results" class="ge-search-dropdown hidden"></div>
+                        </div>
+
+                        <!-- Active Country / Reset Pill -->
+                        <div id="map-active-pill" class="ge-active-pill hidden">
+                            <span id="map-active-pill-text">All Countries</span>
+                            <button onclick="updateLocationStats('Global')" title="Reset to Global" class="ge-pill-reset">↺</button>
+                        </div>
+
+                        <!-- Tile Loading Status Indicator -->
+                        <div id="tile-status-indicator" class="ge-status-indicator" title="Tile Loading State">
+                            <span class="ge-status-dot"></span>
+                            <span id="tile-status-text">Satellite Ready</span>
+                        </div>
+                    </div>
+
+                    <!-- Right Side Floating Controls (Google Earth Style Stack) -->
+                    <div class="ge-controls-stack">
+                        <!-- Fullscreen Toggle -->
+                        <button id="btn-fullscreen" class="ge-control-btn" title="Full Screen Map Mode (F)">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0 0l-5-5m-6 11l-5 5m0 0h4m-4 0v-4m16 4v-4m0 4h-4m4 0l-5-5"/>
+                            </svg>
+                        </button>
+
+                        <!-- Layer Switcher Toggle -->
+                        <div class="relative">
+                            <button id="btn-layers" class="ge-control-btn" title="Switch Map Imagery Layers">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                                </svg>
+                            </button>
+
+                            <!-- Layers Flyout Menu -->
+                            <div id="ge-layers-menu" class="ge-flyout-menu hidden">
+                                <div class="ge-menu-header">Map Layers & Imagery</div>
+                                <div class="ge-layer-options">
+                                    <button class="ge-layer-opt active" data-layer="hybrid">
+                                        <span class="ge-layer-icon">🛰️</span>
+                                        <div class="text-left">
+                                            <div class="font-bold text-xs text-white">Satellite (Hybrid)</div>
+                                            <div class="text-[10px] text-gray-400">Esri high-res imagery + roads & labels</div>
+                                        </div>
+                                    </button>
+                                    <button class="ge-layer-opt" data-layer="satellite">
+                                        <span class="ge-layer-icon">🌍</span>
+                                        <div class="text-left">
+                                            <div class="font-bold text-xs text-white">Pure Satellite</div>
+                                            <div class="text-[10px] text-gray-400">Unobstructed sub-meter satellite photo</div>
+                                        </div>
+                                    </button>
+                                    <button class="ge-layer-opt" data-layer="streets">
+                                        <span class="ge-layer-icon">🗺️</span>
+                                        <div class="text-left">
+                                            <div class="font-bold text-xs text-white">Detailed Streets</div>
+                                            <div class="text-[10px] text-gray-400">Roads, building footprints & transit</div>
+                                        </div>
+                                    </button>
+                                    <button class="ge-layer-opt" data-layer="terrain">
+                                        <span class="ge-layer-icon">🏔️</span>
+                                        <div class="text-left">
+                                            <div class="font-bold text-xs text-white">Topographic Terrain</div>
+                                            <div class="text-[10px] text-gray-400">Elevation contours & natural features</div>
+                                        </div>
+                                    </button>
+                                </div>
+                                
+                                <div class="ge-menu-divider"></div>
+                                <div class="ge-menu-header">Feature Overlays</div>
+                                <label class="ge-toggle-label">
+                                    <input type="checkbox" id="toggle-roads-labels" checked />
+                                    <span>Roads & Place Names</span>
+                                </label>
+                                <label class="ge-toggle-label">
+                                    <input type="checkbox" id="toggle-country-borders" checked />
+                                    <span>Country Borders & Hover</span>
+                                </label>
+                                <label class="ge-toggle-label">
+                                    <input type="checkbox" id="toggle-islands-polar" checked />
+                                    <span>Islands & Research Stations</span>
+                                </label>
+
+                                <div class="ge-menu-divider"></div>
+                                <button id="btn-api-key-config" class="w-full text-[11px] text-cyan-400 hover:text-cyan-300 py-1 text-center bg-cyan-950/40 rounded border border-cyan-800/40">
+                                    ⚙️ Custom API Key (MapTiler / Mapbox)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Current Location (Geolocation) -->
+                        <button id="btn-geolocation" class="ge-control-btn" title="Go to Current Location (GPS)">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                        </button>
+
+                        <div class="ge-control-separator"></div>
+
+                        <!-- Zoom In (+) -->
+                        <button id="btn-zoom-in" class="ge-control-btn font-bold text-lg" title="Zoom In (+)">
+                            +
+                        </button>
+
+                        <!-- Zoom Out (-) -->
+                        <button id="btn-zoom-out" class="ge-control-btn font-bold text-lg" title="Zoom Out (-)">
+                            −
+                        </button>
+
+                        <div class="ge-control-separator"></div>
+
+                        <!-- Reset to Global Perspective -->
+                        <button id="btn-reset-view" class="ge-control-btn" title="Reset to Global Stable Perspective">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                                <path stroke-linecap="round" stroke-width="2" d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Bottom Floating HUD Bar: Coordinates, Zoom & Attribution -->
+                    <div class="ge-bottom-bar">
+                        <div class="ge-coords-badge" id="ge-coords-display">
+                            <span class="text-cyan-400 font-mono font-semibold">20.0000° N, 0.0000° E</span>
+                            <span class="text-gray-500">|</span>
+                            <span>Zoom: <strong id="ge-zoom-level" class="text-white">2.0</strong></span>
+                            <span class="text-gray-500">|</span>
+                            <span class="text-gray-300 font-medium">Esri World Imagery (Maxar, USGS)</span>
+                        </div>
+                    </div>
+
+                    <!-- The Actual Leaflet Map Canvas -->
+                    <div id="map"></div>
+                </div>
+
+                <!-- Footer Quick-Chips Bar under Map -->
+                <div class="p-2.5 px-3 bg-slate-900/60 rounded-xl mt-2 flex flex-wrap items-center justify-between text-xs text-gray-400 gap-2 border border-slate-800/60">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="font-bold text-gray-300">Quick Regional Fly-To:</span>
+                        <button onclick="flyToCountry('United States')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer">🇺🇸 USA</button>
+                        <button onclick="flyToCountry('India')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer">🇮🇳 India</button>
+                        <button onclick="flyToCountry('United Kingdom')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer">🇬🇧 UK</button>
+                        <button onclick="flyToCountry('Japan')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer">🇯🇵 Japan</button>
+                        <button onclick="flyToCountry('Canada')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer">🇨🇦 Canada</button>
+                        <button onclick="flyToCountry('France')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer">🇫🇷 France</button>
+                        <button onclick="flyToCountry('Germany')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer">🇩🇪 Germany</button>
+                        <button onclick="flyToCountry('Australia')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer">🇦🇺 Australia</button>
+                        <button onclick="updateLocationStats('Global')" class="px-2 py-0.5 rounded bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700 font-semibold transition-all cursor-pointer">🌍 Whole Earth</button>
+                    </div>
+                    <div class="text-[11px] text-gray-500 flex items-center gap-1.5">
+                        <span>Max zoom: <strong class="text-cyan-400">Level 20 (Building footprints)</strong></span>
+                    </div>
+                </div>
             </div>
 
             <!-- Right Column: Location Data Tags -->
@@ -968,6 +1490,18 @@
             const graphsCountryElem = document.getElementById('graphs-active-country');
             if (graphsCountryElem) graphsCountryElem.innerText = displayName;
 
+            // Sync with Floating Google Earth Active Pill on the Map
+            const mapPill = document.getElementById('map-active-pill');
+            const mapPillText = document.getElementById('map-active-pill-text');
+            if (mapPill && mapPillText) {
+                if (isGlobal) {
+                    mapPill.classList.add('hidden');
+                } else {
+                    mapPill.classList.remove('hidden');
+                    mapPillText.innerText = '📍 ' + displayName;
+                }
+            }
+
             const resetLocBtn = document.getElementById('reset-loc-btn');
             if (resetLocBtn) {
                 if (isGlobal) resetLocBtn.classList.add('hidden');
@@ -1116,91 +1650,622 @@
             }
         });
 
-        // Fetch GeoJSON for world countries
-        fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
-            .then(response => response.json())
-            .then(data => {
-                const mapElement = document.getElementById('map');
-                
-                // Filter Antarctica (spans 360° causing cross-globe slicing chords; represented via polar stations & satellite ice sheet)
-                // and Bermuda (handled with island dots to prevent polygon winding artifacts)
-                const countries = data.features.filter(d => 
-                    d.properties.name !== 'Antarctica' && d.properties.name !== 'Bermuda'
-                );
-                
-                const globe = Globe()
-                    (mapElement)
-                    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-                    .backgroundColor('#030712')
-                    .showAtmosphere(true)
-                    .atmosphereColor('#38bdf8')
-                    .atmosphereAltitude(0.2)
-                    .polygonsData(countries)
-                    .polygonAltitude(0.005)
-                    .polygonCapColor(() => 'rgba(0, 0, 0, 0)')
-                    .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
-                    .polygonStrokeColor(() => 'rgba(147, 197, 253, 0.55)')
-                    .polygonLabel(({ properties: d }) => `
-                        <div style="background: rgba(17, 24, 39, 0.9); color: white; padding: 6px 10px; border-radius: 6px; font-weight: bold; border: 1px solid #38bdf8; font-family: sans-serif; box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(4px);">
-                            ${d.name}
-                        </div>
-                    `)
-                    .onPolygonHover(hoverD => {
-                        globe
-                            .polygonCapColor(d => d === hoverD ? 'rgba(56, 189, 248, 0.35)' : 'rgba(0, 0, 0, 0)')
-                            .polygonStrokeColor(d => d === hoverD ? '#38bdf8' : 'rgba(147, 197, 253, 0.55)');
-                        if (hoverD) {
-                            mapElement.style.cursor = 'pointer';
-                        } else {
-                            mapElement.style.cursor = 'default';
-                        }
-                    })
-                    .onPolygonClick(({ properties: featureProps }) => {
-                        updateLocationStats(featureProps.name);
-                    })
-                    // Dot-sized Island & Polar Research Station markers
-                    .pointsData(islandDots)
-                    .pointLat(d => d.lat)
-                    .pointLng(d => d.lng)
-                    .pointColor(d => d.isPolar ? '#f0f9ff' : '#38bdf8')
-                    .pointAltitude(0.015)
-                    .pointRadius(d => d.isPolar ? 0.5 : 0.38)
-                    .pointResolution(16)
-                    .pointLabel(d => `
-                        <div style="background: rgba(17, 24, 39, 0.95); color: ${d.isPolar ? '#f0f9ff' : '#38bdf8'}; padding: 6px 12px; border-radius: 6px; font-weight: bold; border: 1px solid ${d.isPolar ? '#93c5fd' : '#38bdf8'}; font-family: sans-serif; box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(4px);">
-                            ${d.isPolar ? '❄️ ' + d.name : '🏝️ ' + d.name} <span style="font-size: 0.75rem; color: #94a3b8; font-weight: normal;">${d.isPolar ? '(Polar Station)' : '(Island)'}</span>
-                        </div>
-                    `)
-                    .onPointHover(hoverD => {
-                        globe.pointColor(d => d === hoverD ? '#ffffff' : (d.isPolar ? '#f0f9ff' : '#38bdf8'));
-                        if (hoverD) {
-                            mapElement.style.cursor = 'pointer';
-                        } else {
-                            mapElement.style.cursor = 'default';
-                        }
-                    })
-                    .onPointClick(d => {
-                        updateLocationStats(d.name);
-                    });
-                    
-                // Auto-rotate the globe slowly
-                globe.controls().autoRotate = true;
-                globe.controls().autoRotateSpeed = 0.5;
-                globe.controls().enableZoom = true;
-                
-                // Adjust size to fit container
-                const resizeGlobe = () => {
-                   globe.width(mapElement.clientWidth);
-                   globe.height(mapElement.clientHeight);
-                };
-                window.addEventListener('resize', resizeGlobe);
-                setTimeout(resizeGlobe, 100);
+        // --- GOOGLE EARTH STYLE ADVANCED SATELLITE MAP ENGINE ---
+        let leafletMap = null;
+        let countriesGeoLayer = null;
+        let islandsLayerGroup = null;
+        let currentSelectedLayer = null;
+        let userLocationMarker = null;
+        let searchPinMarker = null;
+        let activeLayerName = 'Esri World Imagery (Hybrid)';
 
-                // Initialize dashboard stats with Global overview
-                if (window.MOVIES_DATA) {
-                    updateLocationStats('Global', false);
+        // High-Resolution Tile Layers
+        // Esri World Imagery (ArcGIS): authentic sub-meter satellite imagery with zoom up to level 20
+        const esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics, USDA FSA, USGS, Aerogrid, IGN, IGP, and GIS User Community',
+            maxNativeZoom: 19,
+            maxZoom: 20,
+            crossOrigin: true
+        });
+
+        // Esri Transportation Overlay (roads, highways, avenues, lanes)
+        const esriRoadsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+            maxNativeZoom: 19,
+            maxZoom: 20,
+            opacity: 0.95,
+            crossOrigin: true
+        });
+
+        // Esri Boundaries & Places Overlay (country borders, states, cities, towns, neighborhood labels)
+        const esriLabelsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+            maxNativeZoom: 19,
+            maxZoom: 20,
+            opacity: 0.95,
+            crossOrigin: true
+        });
+
+        // Detailed Street Map: CartoDB Voyager / OpenStreetMap (footprints, buildings, parks, streets)
+        const streetsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            maxNativeZoom: 19,
+            maxZoom: 20,
+            subdomains: 'abcd'
+        });
+
+        // Topographic Terrain: Esri World Topo Map
+        const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI',
+            maxNativeZoom: 19,
+            maxZoom: 20
+        });
+
+        function getMovieCountForCountry(countryName) {
+            if (!window.MOVIES_DATA || !countryName) return 0;
+            const resolved = resolveCountry(countryName);
+            const targetLower = (resolved || countryName).toLowerCase();
+            return window.MOVIES_DATA.filter(m => 
+                m.countries && m.countries.some(c => {
+                    const cLow = c.toLowerCase();
+                    if (cLow === targetLower) return true;
+                    if (window.COUNTRY_SYNONYMS && window.COUNTRY_SYNONYMS[targetLower] === c) return true;
+                    return false;
+                })
+            ).length;
+        }
+
+        function initAdvancedSatelliteMap(geoData) {
+            const mapElement = document.getElementById('map');
+            if (!mapElement) return;
+
+            // Initialize Leaflet Map - Stable 2D Top-Down Satellite Perspective
+            // World map is completely stable: no auto-spin, no continuous rotation, North at the top
+            leafletMap = L.map('map', {
+                center: [20, 0],
+                zoom: 2,
+                minZoom: 2,
+                maxZoom: 20,
+                zoomControl: false,
+                worldCopyJump: true,
+                inertia: true,
+                inertiaDeceleration: 3000,
+                zoomAnimation: true,
+                fadeAnimation: true,
+                layers: [esriSatelliteLayer, esriRoadsOverlay, esriLabelsOverlay] // Hybrid default
+            });
+
+            // Add Scale Control (Metric & Imperial)
+            L.control.scale({
+                position: 'bottomleft',
+                metric: true,
+                imperial: true,
+                maxWidth: 150
+            }).addTo(leafletMap);
+
+            // Dynamic Tile Loading Indicators
+            let tilesLoadingCount = 0;
+            const tileStatusDot = document.querySelector('.ge-status-dot');
+            const tileStatusText = document.getElementById('tile-status-text');
+
+            function handleTileStart() {
+                tilesLoadingCount++;
+                if (tileStatusDot) tileStatusDot.className = 'ge-status-dot loading';
+                if (tileStatusText) tileStatusText.innerText = 'Streaming high-res satellite tiles...';
+            }
+            function handleTileEnd() {
+                tilesLoadingCount = Math.max(0, tilesLoadingCount - 1);
+                if (tilesLoadingCount === 0) {
+                    if (tileStatusDot) tileStatusDot.className = 'ge-status-dot';
+                    if (tileStatusText && leafletMap) tileStatusText.innerText = `Satellite Ready (Zoom ${leafletMap.getZoom().toFixed(1)})`;
+                }
+            }
+
+            [esriSatelliteLayer, esriRoadsOverlay, esriLabelsOverlay, streetsLayer, terrainLayer].forEach(layer => {
+                layer.on('tileloadstart', handleTileStart);
+                layer.on('tileload', handleTileEnd);
+                layer.on('tileerror', handleTileEnd);
+            });
+
+            // Live Coordinates HUD Tracking
+            const coordsDisplay = document.getElementById('ge-coords-display');
+            const zoomLevelEl = document.getElementById('ge-zoom-level');
+
+            leafletMap.on('mousemove', (e) => {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                const latStr = Math.abs(lat).toFixed(4) + '° ' + (lat >= 0 ? 'N' : 'S');
+                const lngStr = Math.abs(lng).toFixed(4) + '° ' + (lng >= 0 ? 'E' : 'W');
+                const zoom = leafletMap.getZoom().toFixed(1);
+                if (coordsDisplay) {
+                    coordsDisplay.innerHTML = `
+                        <span class="text-cyan-400 font-mono font-semibold">${latStr}, ${lngStr}</span>
+                        <span class="text-gray-500">|</span>
+                        <span>Zoom: <strong class="text-white">${zoom}</strong></span>
+                        <span class="text-gray-500">|</span>
+                        <span class="text-gray-300 font-medium">${activeLayerName}</span>
+                    `;
                 }
             });
+
+            leafletMap.on('zoomend', () => {
+                if (zoomLevelEl) zoomLevelEl.innerText = leafletMap.getZoom().toFixed(1);
+            });
+
+            // Country GeoJSON Polygons (interactive highlighting & selection)
+            if (geoData && geoData.features) {
+                // Filter Antarctica and Bermuda for clean display
+                const filteredFeatures = geoData.features.filter(d => 
+                    d.properties.name !== 'Antarctica' && d.properties.name !== 'Bermuda'
+                );
+
+                countriesGeoLayer = L.geoJson({ type: 'FeatureCollection', features: filteredFeatures }, {
+                    style: () => ({
+                        color: '#38bdf8',
+                        weight: 1.2,
+                        opacity: 0.55,
+                        fillColor: '#0284c7',
+                        fillOpacity: 0.04
+                    }),
+                    onEachFeature: (feature, layer) => {
+                        const countryName = feature.properties.name;
+                        const count = getMovieCountForCountry(countryName);
+
+                        layer.bindTooltip(`
+                            <div class="ge-tooltip">
+                                <div class="font-bold text-white text-sm flex items-center gap-1.5">
+                                    <span>📍</span> <span>${countryName}</span>
+                                </div>
+                                <div class="text-xs text-cyan-300 mt-0.5">
+                                    ${count > 0 ? `<strong>${count.toLocaleString()}</strong> movies in catalog` : 'No titles cataloged'}
+                                </div>
+                            </div>
+                        `, { sticky: true, className: 'ge-leaflet-tooltip' });
+
+                        layer.on('mouseover', function () {
+                            if (currentSelectedLayer !== this) {
+                                this.setStyle({
+                                    color: '#7dd3fc',
+                                    weight: 2.5,
+                                    opacity: 1,
+                                    fillColor: '#38bdf8',
+                                    fillOpacity: 0.28
+                                });
+                            }
+                            mapElement.style.cursor = 'pointer';
+                        });
+
+                        layer.on('mouseout', function () {
+                            if (currentSelectedLayer !== this) {
+                                countriesGeoLayer.resetStyle(this);
+                            }
+                            mapElement.style.cursor = 'default';
+                        });
+
+                        layer.on('click', function () {
+                            selectCountryLayer(this, countryName);
+                        });
+                    }
+                }).addTo(leafletMap);
+            }
+
+            // Dot-sized Island & Polar Research Station Markers
+            islandsLayerGroup = L.layerGroup();
+            islandDots.forEach(dot => {
+                const marker = L.circleMarker([dot.lat, dot.lng], {
+                    radius: dot.isPolar ? 6 : 4.5,
+                    color: dot.isPolar ? '#93c5fd' : '#38bdf8',
+                    fillColor: dot.isPolar ? '#f0f9ff' : '#0284c7',
+                    fillOpacity: 0.9,
+                    weight: dot.isPolar ? 2.5 : 2
+                });
+
+                marker.bindTooltip(`
+                    <div class="ge-tooltip">
+                        <div class="font-bold text-white text-xs">${dot.isPolar ? '❄️ ' + dot.name : '🏝️ ' + dot.name}</div>
+                        <div class="text-[10px] text-cyan-300">${dot.isPolar ? 'Polar Research Station' : 'Island Territory'}</div>
+                    </div>
+                `, { className: 'ge-leaflet-tooltip' });
+
+                marker.on('click', () => {
+                    updateLocationStats(dot.name);
+                    leafletMap.flyTo([dot.lat, dot.lng], 7, { duration: 1.2 });
+                });
+
+                islandsLayerGroup.addLayer(marker);
+            });
+            islandsLayerGroup.addTo(leafletMap);
+
+            // Wire Google Earth UI Controls
+            setupGoogleEarthControls();
+
+            // Initial Global Overview
+            if (window.MOVIES_DATA) {
+                updateLocationStats('Global', false);
+            }
+        }
+
+        function selectCountryLayer(layer, countryName) {
+            if (currentSelectedLayer && countriesGeoLayer) {
+                countriesGeoLayer.resetStyle(currentSelectedLayer);
+            }
+            currentSelectedLayer = layer;
+            if (layer) {
+                layer.setStyle({
+                    color: '#facc15',
+                    weight: 3,
+                    opacity: 1,
+                    fillColor: '#eab308',
+                    fillOpacity: 0.35
+                });
+                layer.bringToFront();
+                if (layer.getBounds && layer.getBounds().isValid()) {
+                    leafletMap.flyToBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 6, duration: 1.2 });
+                }
+            }
+            updateLocationStats(countryName);
+        }
+
+        function flyToCountry(countryName) {
+            const resolved = resolveCountry(countryName);
+            const target = (resolved || countryName).toLowerCase();
+
+            let matchedLayer = null;
+            if (countriesGeoLayer) {
+                countriesGeoLayer.eachLayer(l => {
+                    if (l.feature && l.feature.properties) {
+                        const name = l.feature.properties.name.toLowerCase();
+                        if (name === target || (window.COUNTRY_SYNONYMS && window.COUNTRY_SYNONYMS[target] === l.feature.properties.name)) {
+                            matchedLayer = l;
+                        }
+                    }
+                });
+            }
+
+            if (matchedLayer) {
+                selectCountryLayer(matchedLayer, countryName);
+            } else {
+                // Check island dots
+                const island = islandDots.find(d => d.name.toLowerCase().includes(target));
+                if (island && leafletMap) {
+                    leafletMap.flyTo([island.lat, island.lng], 7, { duration: 1.2 });
+                }
+                updateLocationStats(countryName);
+            }
+        }
+
+        function setupGoogleEarthControls() {
+            // Zoom In
+            document.getElementById('btn-zoom-in')?.addEventListener('click', () => {
+                if (leafletMap) leafletMap.zoomIn();
+            });
+
+            // Zoom Out
+            document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
+                if (leafletMap) leafletMap.zoomOut();
+            });
+
+            // Reset Global View
+            document.getElementById('btn-reset-view')?.addEventListener('click', () => {
+                if (leafletMap) {
+                    leafletMap.flyTo([20, 0], 2, { duration: 1.2 });
+                }
+                updateLocationStats('Global');
+            });
+
+            // Fullscreen Mode Toggle
+            const btnFullscreen = document.getElementById('btn-fullscreen');
+            const mapContainer = document.getElementById('map-container');
+
+            function toggleFullscreen() {
+                if (!document.fullscreenElement) {
+                    if (mapContainer.requestFullscreen) mapContainer.requestFullscreen();
+                    else if (mapContainer.webkitRequestFullscreen) mapContainer.webkitRequestFullscreen();
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
+                    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                }
+            }
+            btnFullscreen?.addEventListener('click', toggleFullscreen);
+
+            document.addEventListener('fullscreenchange', () => {
+                if (leafletMap) {
+                    setTimeout(() => leafletMap.invalidateSize(), 150);
+                }
+            });
+
+            // Layer Switcher Menu
+            const btnLayers = document.getElementById('btn-layers');
+            const layersMenu = document.getElementById('ge-layers-menu');
+
+            btnLayers?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                layersMenu?.classList.toggle('hidden');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (layersMenu && !layersMenu.contains(e.target) && e.target !== btnLayers) {
+                    layersMenu.classList.add('hidden');
+                }
+            });
+
+            // Layer options switcher
+            const layerButtons = document.querySelectorAll('.ge-layer-opt');
+            layerButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const layerType = btn.getAttribute('data-layer');
+                    layerButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    // Remove current base layers
+                    [esriSatelliteLayer, streetsLayer, terrainLayer].forEach(l => {
+                        if (leafletMap.hasLayer(l)) leafletMap.removeLayer(l);
+                    });
+
+                    if (layerType === 'hybrid') {
+                        leafletMap.addLayer(esriSatelliteLayer);
+                        if (!leafletMap.hasLayer(esriRoadsOverlay)) leafletMap.addLayer(esriRoadsOverlay);
+                        if (!leafletMap.hasLayer(esriLabelsOverlay)) leafletMap.addLayer(esriLabelsOverlay);
+                        activeLayerName = 'Esri World Imagery (Hybrid)';
+                    } else if (layerType === 'satellite') {
+                        leafletMap.addLayer(esriSatelliteLayer);
+                        if (leafletMap.hasLayer(esriRoadsOverlay)) leafletMap.removeLayer(esriRoadsOverlay);
+                        if (leafletMap.hasLayer(esriLabelsOverlay)) leafletMap.removeLayer(esriLabelsOverlay);
+                        activeLayerName = 'Esri Pure Satellite (Sub-meter)';
+                    } else if (layerType === 'streets') {
+                        leafletMap.addLayer(streetsLayer);
+                        if (leafletMap.hasLayer(esriRoadsOverlay)) leafletMap.removeLayer(esriRoadsOverlay);
+                        if (leafletMap.hasLayer(esriLabelsOverlay)) leafletMap.removeLayer(esriLabelsOverlay);
+                        activeLayerName = 'CartoDB / OpenStreetMap Streets';
+                    } else if (layerType === 'terrain') {
+                        leafletMap.addLayer(terrainLayer);
+                        if (leafletMap.hasLayer(esriRoadsOverlay)) leafletMap.removeLayer(esriRoadsOverlay);
+                        if (leafletMap.hasLayer(esriLabelsOverlay)) leafletMap.removeLayer(esriLabelsOverlay);
+                        activeLayerName = 'Esri World Topographic Terrain';
+                    }
+                });
+            });
+
+            // Overlays Toggles
+            document.getElementById('toggle-roads-labels')?.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    leafletMap.addLayer(esriRoadsOverlay);
+                    leafletMap.addLayer(esriLabelsOverlay);
+                } else {
+                    leafletMap.removeLayer(esriRoadsOverlay);
+                    leafletMap.removeLayer(esriLabelsOverlay);
+                }
+            });
+
+            document.getElementById('toggle-country-borders')?.addEventListener('change', (e) => {
+                if (countriesGeoLayer) {
+                    if (e.target.checked) leafletMap.addLayer(countriesGeoLayer);
+                    else leafletMap.removeLayer(countriesGeoLayer);
+                }
+            });
+
+            document.getElementById('toggle-islands-polar')?.addEventListener('change', (e) => {
+                if (islandsLayerGroup) {
+                    if (e.target.checked) leafletMap.addLayer(islandsLayerGroup);
+                    else leafletMap.removeLayer(islandsLayerGroup);
+                }
+            });
+
+            // Current Location (GPS)
+            document.getElementById('btn-geolocation')?.addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    alert('Geolocation is not supported by your browser.');
+                    return;
+                }
+                const btn = document.getElementById('btn-geolocation');
+                btn.style.opacity = '0.5';
+
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        btn.style.opacity = '1';
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        if (leafletMap) {
+                            leafletMap.flyTo([lat, lng], 16, { duration: 2 });
+                            if (userLocationMarker) leafletMap.removeLayer(userLocationMarker);
+                            userLocationMarker = L.circleMarker([lat, lng], {
+                                radius: 8,
+                                color: '#38bdf8',
+                                fillColor: '#0284c7',
+                                fillOpacity: 1,
+                                weight: 3
+                            }).addTo(leafletMap);
+                            userLocationMarker.bindPopup('<strong class="text-sm">📍 Your Current Location</strong><br/><span class="text-xs text-gray-500">GPS Accuracy: ~' + Math.round(pos.coords.accuracy) + 'm</span>').openPopup();
+                        }
+                    },
+                    (err) => {
+                        btn.style.opacity = '1';
+                        alert('Could not retrieve your location: ' + err.message);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            });
+
+            // Custom API Key Modal Trigger
+            document.getElementById('btn-api-key-config')?.addEventListener('click', () => {
+                const key = prompt('Enter your MapTiler API Key (or leave blank to use free Esri World Imagery):', localStorage.getItem('MAPTILER_API_KEY') || '');
+                if (key !== null) {
+                    localStorage.setItem('MAPTILER_API_KEY', key.trim());
+                    if (key.trim()) alert('MapTiler API Key saved! Satellite tile streams configured.');
+                }
+            });
+
+            // Google Earth Search Bar (Geocoding & Dataset Countries)
+            setupMapSearch();
+
+            // Keyboard Shortcuts
+            window.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                if (e.key === '+' || e.key === '=') leafletMap?.zoomIn();
+                if (e.key === '-' || e.key === '_') leafletMap?.zoomOut();
+                if (e.key === '0') leafletMap?.flyTo([20, 0], 2);
+                if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+            });
+        }
+
+        function setupMapSearch() {
+            const input = document.getElementById('map-search-input');
+            const clearBtn = document.getElementById('map-search-clear');
+            const dropdown = document.getElementById('map-search-results');
+            if (!input || !dropdown) return;
+
+            let debounceTimer = null;
+
+            input.addEventListener('input', () => {
+                const q = input.value.trim();
+                if (clearBtn) clearBtn.classList.toggle('hidden', q.length === 0);
+                if (q.length < 2) {
+                    dropdown.classList.add('hidden');
+                    return;
+                }
+
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    performSearch(q);
+                }, 300);
+            });
+
+            clearBtn?.addEventListener('click', () => {
+                input.value = '';
+                clearBtn.classList.add('hidden');
+                dropdown.classList.add('hidden');
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const firstItem = dropdown.querySelector('.ge-search-item');
+                    if (firstItem) firstItem.click();
+                } else if (e.key === 'Escape') {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!document.getElementById('ge-search-container')?.contains(e.target)) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+            function performSearch(query) {
+                const lower = query.toLowerCase();
+                let results = [];
+
+                // 1. Check local dataset countries first
+                if (countriesGeoLayer) {
+                    countriesGeoLayer.eachLayer(l => {
+                        if (l.feature && l.feature.properties) {
+                            const name = l.feature.properties.name;
+                            if (name.toLowerCase().includes(lower)) {
+                                const count = getMovieCountForCountry(name);
+                                results.push({
+                                    title: name,
+                                    subtitle: count > 0 ? `${count.toLocaleString()} movies in catalog` : 'Country Territory',
+                                    type: 'country',
+                                    layer: l,
+                                    name: name
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // 2. Check island dots
+                islandDots.forEach(dot => {
+                    if (dot.name.toLowerCase().includes(lower)) {
+                        results.push({
+                            title: dot.name,
+                            subtitle: dot.isPolar ? 'Polar Research Station' : 'Island Territory',
+                            type: 'island',
+                            lat: dot.lat,
+                            lng: dot.lng,
+                            name: dot.name
+                        });
+                    }
+                });
+
+                // Display local matches immediately
+                renderSearchResults(results, query);
+
+                // 3. Query OpenStreetMap Nominatim for world cities, streets, landmarks
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=4`)
+                    .then(res => res.json())
+                    .then(places => {
+                        places.forEach(p => {
+                            results.push({
+                                title: p.display_name.split(',')[0],
+                                subtitle: p.display_name,
+                                type: 'place',
+                                lat: parseFloat(p.lat),
+                                lng: parseFloat(p.lon),
+                                name: p.display_name
+                            });
+                        });
+                        renderSearchResults(results, query);
+                    })
+                    .catch(() => {});
+            }
+
+            function renderSearchResults(results, query) {
+                if (results.length === 0) {
+                    dropdown.innerHTML = `<div class="p-3 text-xs text-gray-400 text-center">No locations found for "${query}"</div>`;
+                    dropdown.classList.remove('hidden');
+                    return;
+                }
+
+                dropdown.innerHTML = results.slice(0, 6).map(r => `
+                    <div class="ge-search-item" data-type="${r.type}">
+                        <div>
+                            <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <span>${r.type === 'country' ? '🌐' : (r.type === 'island' ? '🏝️' : '📍')}</span>
+                                <span>${r.title}</span>
+                            </div>
+                            <div class="text-[10px] text-gray-400 truncate max-w-[280px]">${r.subtitle}</div>
+                        </div>
+                        <span class="text-[10px] bg-slate-800 text-cyan-300 px-2 py-0.5 rounded border border-slate-700 uppercase font-semibold">
+                            ${r.type}
+                        </span>
+                    </div>
+                `).join('');
+                dropdown.classList.remove('hidden');
+
+                dropdown.querySelectorAll('.ge-search-item').forEach((item, index) => {
+                    item.addEventListener('click', () => {
+                        const r = results[index];
+                        dropdown.classList.add('hidden');
+                        input.value = r.title;
+
+                        if (r.type === 'country' && r.layer) {
+                            selectCountryLayer(r.layer, r.name);
+                        } else if (r.lat !== undefined && r.lng !== undefined) {
+                            if (searchPinMarker && leafletMap) leafletMap.removeLayer(searchPinMarker);
+                            leafletMap.flyTo([r.lat, r.lng], r.type === 'island' ? 7 : 15, { duration: 1.5 });
+                            searchPinMarker = L.marker([r.lat, r.lng]).addTo(leafletMap);
+                            searchPinMarker.bindPopup(`<strong class="text-sm">${r.title}</strong><br/><span class="text-xs text-gray-400">${r.subtitle}</span>`).openPopup();
+                            if (r.type === 'island') {
+                                updateLocationStats(r.name);
+                            }
+                        }
+                    });
+                });
+            }
+        }
+
+        // Initialize Map from Local or Remote GeoJSON
+        if (window.WORLD_COUNTRIES_GEOJSON) {
+            initAdvancedSatelliteMap(window.WORLD_COUNTRIES_GEOJSON);
+        } else {
+            fetch('countries.geo.json')
+                .then(r => r.json())
+                .catch(() => fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json').then(r => r.json()))
+                .then(data => initAdvancedSatelliteMap(data))
+                .catch(err => {
+                    console.error('GeoJSON loading error, initializing base map:', err);
+                    initAdvancedSatelliteMap(null);
+                });
+        }
 
         // Ensure iframe syncs when loaded
         document.addEventListener('DOMContentLoaded', () => {

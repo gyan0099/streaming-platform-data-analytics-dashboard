@@ -26,15 +26,24 @@ const server = http.createServer((req, res) => {
 server.listen(8091, async () => {
     console.log('Server running on http://localhost:8091');
     try {
+        const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH ||
+            (fs.existsSync('/Users/vedprakash/.cache/puppeteer/chrome-headless-shell/mac_arm-154.0.8037.57/chrome-headless-shell-mac-arm64/chrome-headless-shell')
+                ? '/Users/vedprakash/.cache/puppeteer/chrome-headless-shell/mac_arm-154.0.8037.57/chrome-headless-shell-mac-arm64/chrome-headless-shell'
+                : (fs.existsSync('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+                    ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                    : undefined));
+
         const browser = await puppeteer.launch({
             headless: 'new',
+            executablePath: chromePath,
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
         const page = await browser.newPage();
         await page.setViewport({ width: 1400, height: 1200 });
 
         console.log('Navigating to dashboard...');
-        await page.goto('http://localhost:8091/dashboard.html', { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.goto('http://localhost:8091/dashboard.html', { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await new Promise(r => setTimeout(r, 2500));
 
         // Check Initial Global State
         const initialLoc = await page.$eval('#selected-location', el => el.innerText);
